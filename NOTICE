@@ -1,0 +1,23 @@
+MusicSwitcher – third-party components
+
+yt-dlp 2026.10.26 (official zipimport distribution)
+  Unlicense; bundled yt-dlp-ejs includes ISC and MIT components.
+  Source: https://github.com/yt-dlp/yt-dlp/tree/2026.10.26
+  Bundled solver source: https://github.com/yt-dlp/ejs/tree/0.8.0
+  License texts: licenses/yt-dlp.txt
+  SHA-256: e51e69e89489f199530f13d32a4342da3ddb2cf34842f364603a066db05afbf3
+
+Gradle Wrapper 9.1.0
+  Apache License 2.0; license text is included in the wrapper JAR.
+  Source: https://github.com/gradle/gradle/tree/v9.1.0
+  SHA-256: 76805e32c009c0cf0dd5d206bddc9fb22ea42e84db904b764f3047de095493f3
+
+youtubedl-android library/common/ffmpeg 0.18.1
+  The published Maven artifacts declare GPL-3.0.
+  Source: https://github.com/JunkFood02/youtubedl-android
+  The Android native packages contain Python (PSF-2.0), QuickJS
+  (MIT), and FFmpeg with its own build-dependent component licenses.
+  Refer to the upstream sources and Android build instructions before redistributing.
+
+AndroidX, Jetpack Compose, Media3, Kotlin, Apache Commons IO and Jackson
+  Apache License 2.0. See the upstream copyright notices.

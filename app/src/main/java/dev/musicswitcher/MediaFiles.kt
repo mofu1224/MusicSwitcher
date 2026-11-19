@@ -1,0 +1,16 @@
+package dev.musicswitcher
+
+private val audioExtensions = setOf("mp3", "m4a", "aac", "flac", "wav", "ogg", "oga", "opus", "amr", "mka")
+
+internal fun isAudioFile(name: String, mime: String): Boolean {
+    val extension = name.substringAfterLast('.', "").lowercase()
+    return extension !in setOf("partial", "part", "tmp") &&
+        (mime.startsWith("audio/") || extension in audioExtensions)
+}
+
+internal fun uniqueAudioName(original: String, occupiedLowercaseNames: Set<String>): String {
+    if (original.lowercase() !in occupiedLowercaseNames) return original
+    val stem = original.substringBeforeLast('.')
+    return generateSequence(2) { it + 1 }.map { "$stem ($it).m4a" }
+        .first { it.lowercase() !in occupiedLowercaseNames }
+}

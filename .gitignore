@@ -1,0 +1,35 @@
+# Project-local toolchains, emulator data, caches and verification artifacts
+/.gradle/
+/.kotlin/
+/.local/
+**/build/
+
+# Android SDK paths and generated packages
+local.properties
+*.apk
+*.ap_
+*.aab
+
+# Signing keys and local credentials
+keystore.properties
+signing.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# IDE, OS and test artifacts
+/.idea/
+/.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.log
