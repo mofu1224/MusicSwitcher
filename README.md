@@ -38,4 +38,8 @@ python scripts/smoke_android.py --serial emulator-5556 --apk app/build/outputs/a
 
 アプリの実行に外部のPython、Termux、FFmpegやサーバーは不要です。[yt-dlp 2026.10.26](https://github.com/yt-dlp/yt-dlp/releases/tag/2026.10.26) のzipimport配布物を固定し、ビルド時にSHA-256を照合します。Python、QuickJS、FFmpegは `youtubedl-android` 0.18.1 のAndroid向けライブラリに含まれます。
 
-このリポジトリはソースとビルドに必要な資材のみを公開します。生成されたAPKは開発・手元検証用で、リポジトリには含まれません。APKを再配布する場合は、[同梱ライブラリのライセンス](NOTICE)と対応ソースの提供条件を確認してください。
+## ライセンス
+
+MusicSwitcher独自のソースコードは [MITライセンス](LICENSE) です。同梱・依存する第三者のソフトウェアには、それぞれのライセンスが適用されます。詳しくは [NOTICE](NOTICE) を参照してください。
+
+このリポジトリはソースとビルドに必要な資材のみを公開し、生成されたAPKは含めません。APKを再配布する場合は、GPL-3.0を含む依存ライブラリのライセンスと、対応するソースコードの提供条件を確認してください。
