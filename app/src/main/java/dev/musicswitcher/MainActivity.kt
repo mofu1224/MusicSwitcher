@@ -24,14 +24,16 @@ class MainActivity : ComponentActivity() {
             val connection = rememberPlaybackConnection()
             val controller = connection.controller
             val playing = rememberNowPlaying(controller)
+            val clearPlayback: () -> Unit = {
+                controller?.stop()
+                controller?.clearMediaItems()
+                Unit
+            }
             val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 val data = result.data
                 if (result.resultCode == Activity.RESULT_OK && data != null) {
                     data.data?.let { tree ->
-                        model.selectFolder(tree, data.flags) {
-                            controller?.stop()
-                            controller?.clearMediaItems()
-                        }
+                        model.selectFolder(tree, data.flags, clearPlayback)
                     }
                 }
             }
@@ -58,6 +60,27 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     onRefresh = model::refresh,
+                    onSwitchLibrary = { model.switchLibrary(it, clearPlayback) },
+                    onForgetLibrary = { model.forgetLibrary(it, clearPlayback) },
+                    onDeleteTrack = { uri ->
+                        model.deleteTrack(uri) {
+                            controller?.let { player ->
+                                for (index in player.mediaItemCount - 1 downTo 0) {
+                                    if (player.getMediaItemAt(index).mediaId == uri.toString()) player.removeMediaItem(index)
+                                }
+                            }
+                        }
+                    },
+                    onMoveLibrary = model::moveLibrary,
+                    onMoveTrack = { from, to ->
+                        model.moveTrack(from, to)
+                        controller?.let { player ->
+                            val queue = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
+                            val a = queue.indexOf(from)
+                            val b = queue.indexOf(to)
+                            if (a >= 0 && b >= 0) player.moveMediaItem(a, b)
+                        }
+                    },
                     onDownload = model::download,
                     onCancelDownload = model::cancelDownload,
                     onDismissDownload = model::dismissDownload,

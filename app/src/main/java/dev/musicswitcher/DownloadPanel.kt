@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -23,24 +24,35 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun DownloadDialog(onDismiss: () -> Unit, onDownload: (String) -> Boolean) {
     var url by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    val submit = {
+        val link = parseDownloadUrl(url)
+        error = when {
+            link == null -> "Use an HTTPS link."
+            !onDownload(link) -> "Check the folder and retry."
+            else -> null
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("URLから音楽を保存") },
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+        title = { Text("Import link") },
         text = {
             Column {
-                Text("ダウンロードが許可されたコンテンツのHTTPSリンクを貼り付けてください。")
                 OutlinedTextField(
                     value = url, onValueChange = { url = it; error = null },
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    label = { Text("音楽のURL") },
+                    label = { Text("URL") },
+                    placeholder = { Text("https://") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                    keyboardActions = KeyboardActions(onGo = { if (url.isNotBlank()) submit() }),
                     isError = error != null,
                     supportingText = error?.let { message -> { Text(message) } },
                 )
@@ -49,16 +61,10 @@ internal fun DownloadDialog(onDismiss: () -> Unit, onDownload: (String) -> Boole
         confirmButton = {
             Button(
                 enabled = url.isNotBlank(),
-                onClick = {
-                    error = when {
-                        parseDownloadUrl(url) == null -> "有効なHTTPSのURLを入力してください。"
-                        !onDownload(url) -> "保存先を確認して、もう一度試してください。"
-                        else -> null
-                    }
-                },
-            ) { Text("保存する") }
+                onClick = submit,
+            ) { Text("Save") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("閉じる") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
     )
 }
 
@@ -71,13 +77,13 @@ internal fun DownloadPanel(status: DownloadUi, onCancel: () -> Unit, onDismiss: 
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         when {
-                            status.saving -> "フォルダに保存中…"
-                            status.progress == null -> "音声を取得中…"
-                            else -> "音声を取得中… ${status.progress}%"
+                            status.saving -> "Saving"
+                            status.progress == null -> "Fetching"
+                            else -> "Fetching ${status.progress}%"
                         },
                         Modifier.weight(1f),
                     )
-                    if (!status.saving) TextButton(onClick = onCancel) { Text("キャンセル") }
+                    if (!status.saving) TextButton(onClick = onCancel) { Text("Cancel") }
                 }
                 if (status.saving || status.progress == null) LinearProgressIndicator(Modifier.fillMaxWidth())
                 else LinearProgressIndicator(progress = { status.progress / 100f }, Modifier.fillMaxWidth())
@@ -90,7 +96,7 @@ internal fun DownloadPanel(status: DownloadUi, onCancel: () -> Unit, onDismiss: 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(status.text, Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite })
-                TextButton(onClick = onDismiss) { Text("閉じる") }
+                TextButton(onClick = onDismiss) { Text("Close") }
             }
             HorizontalDivider()
         }

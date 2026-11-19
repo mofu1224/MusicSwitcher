@@ -32,7 +32,9 @@ internal class AudioDownloader(private val context: Context) {
                 .addOption("--max-filesize", "200M")
                 .addOption("--format", "bestaudio/best")
                 .addOption("--extract-audio")
-                .addOption("--audio-format", "m4a")
+                .addOption("--audio-format", "best")
+                // Even for an unknown codec, never fall back to a lossy encoder.
+                .addOption("--postprocessor-args", "ExtractAudio+ffmpeg_o:-c:a copy")
                 .addOption("--windows-filenames")
                 .addOption("--trim-filenames", 80)
                 .addOption("--paths", workspace.absolutePath)
@@ -41,7 +43,7 @@ internal class AudioDownloader(private val context: Context) {
             engine.execute(request, UUID.randomUUID().toString()) { value, _, _ ->
                 onProgress(value.takeIf { it.isFinite() && it in 0f..100f }?.toInt())
             }
-            workspace.listFiles()?.singleOrNull { it.isFile && it.extension == "m4a" && it.length() > 0 }
+            workspace.listFiles()?.singleOrNull { it.isFile && isAudioFile(it.name, "") && it.length() > 0 }
                 ?: throw IOException("No completed audio output")
         }
 

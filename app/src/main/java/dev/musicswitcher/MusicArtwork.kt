@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -81,22 +82,27 @@ internal fun MusicArtwork(label: String, modifier: Modifier = Modifier, image: I
                     drawLine(ink, Offset(bx, y + unit * .56f - half), Offset(bx, y + unit * .56f + half), unit * .033f, StrokeCap.Round)
                 }
             } else {
-                val pivot = Offset(size.width * .54f, size.height * .5f)
+                drawRect(Brush.linearGradient(coverTones))
+                val pivot = Offset(size.width * .72f, size.height * .39f)
                 repeat(7) { ring ->
-                    drawCircle(ink.copy(alpha = .14f + ring * .023f), unit * (.16f + ring * .052f), pivot, style = Stroke(unit * .013f))
+                    drawCircle(Color.White.copy(alpha = .16f + ring * .016f), unit * (.16f + ring * .052f), pivot, style = Stroke(unit * .008f))
                 }
-                drawCircle(ink.copy(alpha = .20f), unit * .12f, pivot)
-                drawCircle(ink.copy(alpha = .75f), unit * .030f, pivot)
+                drawCircle(Color.White.copy(alpha = .30f), unit * .12f, pivot)
+                drawCircle(Color.White, unit * .030f, pivot)
                 repeat(3) { bar ->
                     val phase = ((seed ushr (bar * 4)) and 7) / 7f
-                    drawRect(ink.copy(alpha = .68f - bar * .12f), Offset(unit * .09f, unit * (.69f + bar * .058f)), Size(unit * (.11f + phase * .19f), unit * .022f))
+                    drawRect(Color.White.copy(alpha = .78f - bar * .12f), Offset(unit * .09f, unit * (.69f + bar * .058f)), Size(unit * (.11f + phase * .19f), unit * .022f))
                 }
             }
         }
     }
 }
 
-internal enum class Glyph { Play, Pause, Previous, Next, Collapse, Refresh, Sun, Moon }
+private val coverTones = listOf(
+    Color(0xFF262626), Color(0xFF777777), Color(0xFF393939),
+)
+
+internal enum class Glyph { Play, Pause, Previous, Next, Collapse, Refresh, Sun, Moon, Folder, Download }
 
 @Composable
 internal fun MusicGlyph(glyph: Glyph, modifier: Modifier, description: String? = null, color: Color = LocalContentColor.current) {
@@ -113,6 +119,14 @@ internal fun MusicGlyph(glyph: Glyph, modifier: Modifier, description: String? =
                 drawPath(Path().apply { moveTo(start, 4f); lineTo(tip, 12f); lineTo(start, 20f); close() }, color)
             }
             when (glyph) {
+                Glyph.Download -> {
+                    line(12f, 3f, 12f, 15f); line(7f, 10f, 12f, 15f); line(12f, 15f, 17f, 10f)
+                    line(3f, 16f, 3f, 20f); line(3f, 20f, 21f, 20f); line(21f, 20f, 21f, 16f)
+                }
+                Glyph.Folder -> drawPath(Path().apply {
+                    moveTo(3f, 6f); lineTo(9f, 6f); lineTo(12f, 9f); lineTo(21f, 9f)
+                    lineTo(21f, 19f); lineTo(3f, 19f); close()
+                }, color, style = Stroke(1.8f, join = StrokeJoin.Round))
                 Glyph.Play -> triangle(reverse = false)
                 Glyph.Pause -> {
                     drawRect(color, Offset(6f, 4f), Size(4.5f, 16f))

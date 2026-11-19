@@ -73,6 +73,16 @@ internal class FolderLibrary(private val resolver: ContentResolver) {
         )
     }
 
+    fun deleteTrack(uri: Uri) {
+        val deletable = query(uri) { cursor ->
+            cursor.moveToFirst() && cursor.entry().let {
+                it.mime != Document.MIME_TYPE_DIR && isAudioFile(it.name, it.mime) &&
+                    it.flags and Document.FLAG_SUPPORTS_DELETE != 0
+            }
+        }
+        if (!deletable || !DocumentsContract.deleteDocument(resolver, uri)) throw IOException("Delete failed")
+    }
+
     suspend fun publish(tree: Uri, file: File): String {
         val rootId = DocumentsContract.getTreeDocumentId(tree)
         val root = document(tree, rootId)
