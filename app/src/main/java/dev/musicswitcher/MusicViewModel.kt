@@ -16,6 +16,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.File
@@ -31,14 +35,16 @@ internal data class MusicUiState(
     val scanning: Boolean = false,
     val folderError: String? = null,
     val darkMode: Boolean? = null,
-    val download: DownloadUi = DownloadUi.Idle,
+    val downloads: List<DownloadItem> = emptyList(),
 ) {
     val canRefresh get() = hasFolderSelection && !scanning
+    val downloading get() = downloads.any { it.status !is DownloadUi.Message }
 }
 
+internal data class DownloadItem(val id: Long, val status: DownloadUi)
 internal sealed interface DownloadUi {
-    data object Idle : DownloadUi
-    data class Working(val id: Long, val progress: Int? = null, val saving: Boolean = false) : DownloadUi
+    data object Queued : DownloadUi
+    data class Working(val progress: Int? = null, val saving: Boolean = false) : DownloadUi
     data class Message(val text: String) : DownloadUi
 }
 
@@ -50,7 +56,9 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
     private val cacheDir = application.cacheDir
     private var tree = preferences.getString("tree", null)?.let(Uri::parse)
     private var scanJob: Job? = null
-    private var downloadJob: Job? = null
+    private val downloadJobs = mutableMapOf<Long, Job>()
+    private val slots = Semaphore(2)
+    private val saveLock = Mutex()
     private var downloadId = 0L
     private val ui = MutableStateFlow(
         MusicUiState(
@@ -120,7 +128,7 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
 
     fun forgetLibrary(uri: Uri, onChanged: () -> Unit) {
         val entries = ui.value.libraries
-        if (ui.value.download is DownloadUi.Working || entries.none { it.uri == uri }) return
+        if (ui.value.downloading || entries.none { it.uri == uri }) return
         val remaining = entries.filterNot { it.uri == uri }
         val changed = tree == uri
         if (changed) {
@@ -143,13 +151,13 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
         ui.update {
             if (!changed) it.copy(libraries = remaining)
             else it.copy(libraries = remaining, activeLibrary = tree, hasFolderSelection = tree != null,
-                folder = null, scanning = false, folderError = null, download = DownloadUi.Idle)
+                folder = null, scanning = false, folderError = null, downloads = emptyList())
         }
         if (changed) refresh()
     }
 
     fun selectFolder(uri: Uri, resultFlags: Int, onChanged: () -> Unit) {
-        if (ui.value.download is DownloadUi.Working) return
+        if (ui.value.downloading) return
         val flags = resultFlags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         try {
             resolver.takePersistableUriPermission(uri, flags)
@@ -164,7 +172,7 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun switchLibrary(uri: Uri, onChanged: () -> Unit) {
-        if (uri == tree || ui.value.download is DownloadUi.Working || ui.value.libraries.none { it.uri == uri }) return
+        if (uri == tree || ui.value.downloading || ui.value.libraries.none { it.uri == uri }) return
         activate(uri, onChanged)
     }
 
@@ -175,7 +183,7 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
         preferences.edit { putString("tree", uri.toString()); putStringSet("libraries", ids) }
         if (uri != previous) {
             onChanged()
-            ui.update { it.copy(folder = null, hasFolderSelection = true, download = DownloadUi.Idle,
+            ui.update { it.copy(folder = null, hasFolderSelection = true, downloads = emptyList(),
                 libraries = savedLibraries(), activeLibrary = uri) }
         }
         refresh()
@@ -211,53 +219,60 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
     fun download(input: String): Boolean {
         val url = parseDownloadUrl(input) ?: return false
         val selected = tree ?: return false
-        if (ui.value.folder?.canSave != true || downloadJob?.isCompleted == false) return false
+        if (ui.value.folder?.canSave != true) return false
         val id = ++downloadId
-        ui.update { it.copy(download = DownloadUi.Working(id)) }
-        downloadJob = viewModelScope.launch {
+        ui.update { it.copy(downloads = it.downloads + DownloadItem(id, DownloadUi.Queued)) }
+        downloadJobs[id] = viewModelScope.launch {
             var workspace: File? = null
             var saving = false
             try {
+                slots.withPermit {
+                updateDownload(id, DownloadUi.Working())
                 val directory = withContext(Dispatchers.IO) {
                     Files.createTempDirectory(cacheDir.toPath(), "audio-").toFile().also { workspace = it }
                 }
                 val audio = withTimeout(20 * 60 * 1_000L) {
                     downloader.fetch(url, directory) { progress ->
-                        ui.update { state ->
-                            val working = state.download as? DownloadUi.Working
-                            if (working?.id != id || working.saving || working.progress == progress) state
-                            else state.copy(download = working.copy(progress = progress))
-                        }
+                        updateDownload(id, DownloadUi.Working(progress))
                     }
                 }
                 saving = true
-                ui.update { it.copy(download = DownloadUi.Working(id, saving = true)) }
-                val name = withContext(Dispatchers.IO) { library.publish(selected, audio) }
-                ui.update { it.copy(download = DownloadUi.Message("Saved: $name")) }
+                updateDownload(id, DownloadUi.Working(saving = true))
+                val name = saveLock.withLock { withContext(Dispatchers.IO) { library.publish(selected, audio) } }
+                updateDownload(id, DownloadUi.Message("Saved: $name"))
                 refresh()
+                }
             } catch (_: TimeoutCancellationException) {
-                ui.update { it.copy(download = DownloadUi.Message("Timed out. Retry.")) }
+                updateDownload(id, DownloadUi.Message("Timed out. Retry."))
             } catch (error: CancellationException) {
-                ui.update { it.copy(download = DownloadUi.Message("Canceled")) }
+                updateDownload(id, DownloadUi.Message("Canceled"))
                 throw error
             } catch (error: Exception) {
                 Log.w("MusicSwitcher", "Audio import failed (${error.javaClass.simpleName}); saving=$saving")
                 val message = if (saving) "Save failed. Check access and storage."
                 else "Fetch failed. Check link and connection."
-                ui.update { it.copy(download = DownloadUi.Message(message)) }
+                updateDownload(id, DownloadUi.Message(message))
             } finally {
                 withContext(Dispatchers.IO + NonCancellable) { workspace?.deleteRecursively() }
+                downloadJobs.remove(id)
             }
         }
         return true
     }
 
-    fun cancelDownload() {
-        if ((ui.value.download as? DownloadUi.Working)?.saving == false) downloadJob?.cancel()
+    private fun updateDownload(id: Long, status: DownloadUi) {
+        ui.update { state -> state.copy(downloads = state.downloads.map {
+            if (it.id == id) it.copy(status = status) else it
+        }) }
     }
 
-    fun dismissDownload() {
-        ui.update { if (it.download is DownloadUi.Message) it.copy(download = DownloadUi.Idle) else it }
+    fun cancelDownload(id: Long) {
+        val status = ui.value.downloads.find { it.id == id }?.status
+        if (status == DownloadUi.Queued || status is DownloadUi.Working && !status.saving) downloadJobs[id]?.cancel()
+    }
+
+    fun dismissDownload(id: Long) {
+        ui.update { state -> state.copy(downloads = state.downloads.filterNot { it.id == id && it.status is DownloadUi.Message }) }
     }
 
 }

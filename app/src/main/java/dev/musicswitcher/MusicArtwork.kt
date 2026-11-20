@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -105,9 +106,10 @@ private val coverTones = listOf(
 internal enum class Glyph { Play, Pause, Previous, Next, Collapse, Refresh, Sun, Moon, Folder, Download }
 
 @Composable
-internal fun MusicGlyph(glyph: Glyph, modifier: Modifier, description: String? = null, color: Color = LocalContentColor.current) {
+internal fun MusicGlyph(glyph: Glyph, modifier: Modifier, description: String? = null, tint: Color = LocalContentColor.current) {
     val semantics = if (description == null) Modifier else Modifier.semantics { contentDescription = description }
-    Canvas(modifier.then(semantics)) {
+    val color = tint.copy(alpha = 1f)
+    Canvas(modifier.then(semantics).alpha(tint.alpha)) {
         scale(size.width / 24f, size.height / 24f, pivot = Offset.Zero) {
             fun line(a: Float, b: Float, c: Float, d: Float) =
                 drawLine(color, Offset(a, b), Offset(c, d), 2f, cap = StrokeCap.Round)

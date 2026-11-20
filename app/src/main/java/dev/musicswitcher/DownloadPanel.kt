@@ -69,9 +69,15 @@ internal fun DownloadDialog(onDismiss: () -> Unit, onDownload: (String) -> Boole
 }
 
 @Composable
-internal fun DownloadPanel(status: DownloadUi, onCancel: () -> Unit, onDismiss: () -> Unit) {
-    when (status) {
-        DownloadUi.Idle -> Unit
+internal fun DownloadPanel(item: DownloadItem, onCancel: () -> Unit, onDismiss: () -> Unit) {
+    when (val status = item.status) {
+        DownloadUi.Queued -> {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Queued #${item.id}", Modifier.weight(1f))
+                TextButton(onClick = onCancel) { Text("Cancel") }
+            }
+            HorizontalDivider()
+        }
         is DownloadUi.Working -> {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 5.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -80,7 +86,7 @@ internal fun DownloadPanel(status: DownloadUi, onCancel: () -> Unit, onDismiss: 
                             status.saving -> "Saving"
                             status.progress == null -> "Fetching"
                             else -> "Fetching ${status.progress}%"
-                        },
+                        } + " #${item.id}",
                         Modifier.weight(1f),
                     )
                     if (!status.saving) TextButton(onClick = onCancel) { Text("Cancel") }

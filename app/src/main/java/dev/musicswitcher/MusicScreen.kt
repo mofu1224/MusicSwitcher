@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,7 +25,7 @@ import androidx.media3.session.MediaController
 internal fun MusicScreen(
     state: MusicUiState, playing: NowPlaying, controller: MediaController?, connectionFailed: Boolean,
     darkMode: Boolean, onToggleTheme: () -> Unit, onChooseFolder: () -> Unit, onRefresh: () -> Unit,
-    onDownload: (String) -> Boolean, onCancelDownload: () -> Unit, onDismissDownload: () -> Unit,
+    onDownload: (String) -> Boolean, onCancelDownload: (Long) -> Unit, onDismissDownload: (Long) -> Unit,
     onSwitchLibrary: (android.net.Uri) -> Unit,
     onDeleteTrack: (android.net.Uri) -> Unit, onForgetLibrary: (android.net.Uri) -> Unit,
     onMoveLibrary: (String, String) -> Unit, onMoveTrack: (String, String) -> Unit,
@@ -35,7 +36,7 @@ internal fun MusicScreen(
     val tracks = folder?.tracks.orEmpty()
     var trackAction by remember(state.activeLibrary) { mutableStateOf<String?>(null) }
     var libraryAction by remember { mutableStateOf<String?>(null) }
-    val downloading = state.download is DownloadUi.Working
+    val downloading = state.downloading
     val scroll = key(state.activeLibrary) { rememberLazyListState() }
     val trackDrag = rememberListDrag(scroll)
     val artwork = rememberTrackArtwork(playing.artworkData)
@@ -97,7 +98,7 @@ internal fun MusicScreen(
                             }
                         }
                     }
-                    IconButton(onClick = { showDownload = true }, enabled = folder?.canSave == true && !downloading && !state.scanning) {
+                    IconButton(onClick = { showDownload = true }, enabled = folder?.canSave == true) {
                         MusicGlyph(Glyph.Download, Modifier.size(22.dp), "Import link")
                     }
                 }
@@ -113,7 +114,11 @@ internal fun MusicScreen(
             }, label = "player reveal") { expanded ->
             if (expanded) NowPlayingScreen(playing, location, artwork, controller)
             else Column(Modifier.widthIn(max = 760.dp).fillMaxSize()) {
-                DownloadPanel(state.download, onCancelDownload, onDismissDownload)
+                if (state.downloads.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().heightIn(max = 156.dp)) {
+                    items(state.downloads, key = { it.id }) { item ->
+                        DownloadPanel(item, { onCancelDownload(item.id) }, { onDismissDownload(item.id) })
+                    }
+                }
                 if (state.scanning) LinearProgressIndicator(Modifier.fillMaxWidth())
                 LazyColumn(Modifier.fillMaxWidth().weight(1f).dragList(trackDrag, onMoveTrack) { trackAction = it }, state = scroll,
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
@@ -141,6 +146,8 @@ internal fun MusicScreen(
                                     style = MaterialTheme.typography.headlineLarge)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text("${tracks.size} ${if (tracks.size == 1) "track" else "tracks"}", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+                                    TextButton(onClick = { controller?.playTracks(tracks.shuffled(), 0) },
+                                        enabled = tracks.isNotEmpty() && controller != null) { Text("Shuffle") }
                                     IconButton(onClick = onRefresh, enabled = state.canRefresh) {
                                         MusicGlyph(Glyph.Refresh, Modifier.size(18.dp), "Refresh")
                                     }
@@ -151,7 +158,7 @@ internal fun MusicScreen(
                                  InlineMessage("No tracks")
                                  Text("Add audio files to this folder, then tap Refresh.",
                                      style = MaterialTheme.typography.bodySmall)
-                                 if (folder.canSave) TextButton(onClick = { showDownload = true }, enabled = !downloading) {
+                                 if (folder.canSave) TextButton(onClick = { showDownload = true }) {
                                      Text("Import link")
                                  }
                              }

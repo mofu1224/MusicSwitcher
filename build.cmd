@@ -12,9 +12,9 @@ if exist "%CD%\.local\toolchain\sdk\platforms\android-36\android.jar" (
 if not defined ANDROID_HOME if defined ANDROID_SDK_ROOT set "ANDROID_HOME=%ANDROID_SDK_ROOT%"
 if not defined ANDROID_HOME if exist "%LOCALAPPDATA%\Android\Sdk\platforms\android-36\android.jar" set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
 if defined INTERACTIVE (
-    call gradlew.bat :app:assembleDebug
+    call "%~dp0gradlew.bat" :app:assembleDebug
 ) else (
-    call gradlew.bat %*
+    call "%~dp0gradlew.bat" %*
 )
 set "RESULT=%ERRORLEVEL%"
 popd

@@ -15,10 +15,12 @@ import java.util.UUID
 internal class AudioDownloader(private val context: Context) {
     suspend fun fetch(url: String, workspace: File, onProgress: (Int?) -> Unit): File =
         runInterruptible(Dispatchers.IO) {
-            FFmpeg.getInstance().init(context)
             val engine = YoutubeDL.getInstance()
-            installPinnedCore()
-            engine.init(context)
+            synchronized(initLock) {
+                FFmpeg.getInstance().init(context)
+                installPinnedCore()
+                engine.init(context)
+            }
             val request = YoutubeDLRequest(url)
                 .addOption("--ignore-config")
                 .addOption("--no-playlist")
@@ -46,6 +48,8 @@ internal class AudioDownloader(private val context: Context) {
             workspace.listFiles()?.singleOrNull { it.isFile && isAudioFile(it.name, "") && it.length() > 0 }
                 ?: throw IOException("No completed audio output")
         }
+
+    private companion object { val initLock = Any() }
 
     private fun installPinnedCore() {
         // youtubedl-android 0.18.1 otherwise keeps the first engine copy across APK updates.

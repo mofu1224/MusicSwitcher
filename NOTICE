@@ -23,6 +23,13 @@ youtubedl-android library/common/ffmpeg 0.18.1
   (MIT), and FFmpeg with its own build-dependent component licenses.
   Refer to the upstream sources and Android build instructions before redistributing.
 
+libwebp 1.6.0 (including SharpYUV)
+  BSD 3-Clause; license: app/src/main/assets/licenses/libwebp.txt (included in the APK).
+  Source: https://github.com/webmproject/libwebp/tree/v1.6.0
+  Android binaries: Termux libwebp 1.6.0.0.0.1+really1.6.0 (aarch64 and x86_64).
+  Build recipe: https://github.com/termux/termux-packages/tree/master/packages/libwebp
+  Package names, pinned hashes and repackaging steps: app/native/README.md and scripts/prepare_ffmpeg_webp.py.
+
 AndroidX, Jetpack Compose, Media3, Kotlin, Apache Commons IO and Jackson
   Apache License 2.0. See the upstream copyright notices.
 
