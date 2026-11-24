@@ -72,9 +72,9 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onMoveLibrary = model::moveLibrary,
+                    onTrackSort = model::setTrackSort,
                     onMoveTrack = { from, to ->
-                        model.moveTrack(from, to)
-                        controller?.let { player ->
+                        if (model.moveTrack(from, to)) controller?.let { player ->
                             val queue = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
                             val a = queue.indexOf(from)
                             val b = queue.indexOf(to)

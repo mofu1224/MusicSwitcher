@@ -35,6 +35,7 @@ internal data class MusicUiState(
     val scanning: Boolean = false,
     val folderError: String? = null,
     val darkMode: Boolean? = null,
+    val trackSort: TrackSort = TrackSort.Manual,
     val downloads: List<DownloadItem> = emptyList(),
 ) {
     val canRefresh get() = hasFolderSelection && !scanning
@@ -60,11 +61,13 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
     private val slots = Semaphore(2)
     private val saveLock = Mutex()
     private var downloadId = 0L
+    private var scannedTracks: List<Track> = emptyList()
     private val ui = MutableStateFlow(
         MusicUiState(
             hasFolderSelection = tree != null,
             libraries = savedLibraries(), activeLibrary = tree,
             darkMode = if (preferences.contains("dark")) preferences.getBoolean("dark", false) else null,
+            trackSort = TrackSort.of(preferences.getString("trackSort:$tree", null)),
         ),
     )
     val state = ui.asStateFlow()
@@ -82,10 +85,21 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
         return ordered("libraryOrder", entries) { it.uri.toString() }
     }
 
-    private fun <T> ordered(key: String, items: List<T>, id: (T) -> String): List<T> {
-        val stored = preferences.getString(key, null) ?: return items
-        val ranks = stored.split('\n').withIndex().associate { it.value to it.index }
-        return items.sortedBy { ranks[id(it)] ?: Int.MAX_VALUE }
+    private fun <T> ordered(key: String, items: List<T>, id: (T) -> String): List<T> =
+        applyStoredOrder(items, preferences.getString(key, null), id)
+
+    private fun arranged(library: Uri, tracks: List<Track>, sort: TrackSort) = arrangeTracks(
+        tracks, sort, preferences.getString("trackOrder:$library", null),
+        { it.title }, { it.directory }, { it.uri.toString() },
+    )
+
+    fun setTrackSort(sort: TrackSort) {
+        val selected = tree ?: return
+        if (sort == ui.value.trackSort) return
+        preferences.edit { putString("trackSort:$selected", sort.key) }
+        ui.update { state ->
+            state.copy(trackSort = sort, folder = state.folder?.copy(tracks = arranged(selected, scannedTracks, sort)))
+        }
     }
 
     private fun <T> move(key: String, items: List<T>, from: String, to: String, id: (T) -> String): List<T> {
@@ -103,10 +117,13 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
         ui.update { it.copy(libraries = entries) }
     }
 
-    fun moveTrack(from: String, to: String) {
-        val folder = ui.value.folder ?: return
+    fun moveTrack(from: String, to: String): Boolean {
+        val folder = ui.value.folder ?: return false
+        if (ui.value.trackSort != TrackSort.Manual) return false
         val tracks = move("trackOrder:$tree", folder.tracks, from, to) { it.uri.toString() }
+        if (tracks === folder.tracks) return false
         ui.update { it.copy(folder = folder.copy(tracks = tracks)) }
+        return true
     }
 
     fun deleteTrack(uri: Uri, onDeleted: () -> Unit) {
@@ -142,6 +159,7 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
             putString("libraryOrder", remaining.joinToString("\n") { it.uri.toString() })
             remove("name:$uri")
             remove("trackOrder:$uri")
+            remove("trackSort:$uri")
         }
         resolver.persistedUriPermissions.firstOrNull { it.uri == uri }?.let { grant ->
             val flags = (if (grant.isReadPermission) Intent.FLAG_GRANT_READ_URI_PERMISSION else 0) or
@@ -151,7 +169,8 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
         ui.update {
             if (!changed) it.copy(libraries = remaining)
             else it.copy(libraries = remaining, activeLibrary = tree, hasFolderSelection = tree != null,
-                folder = null, scanning = false, folderError = null, downloads = emptyList())
+                folder = null, scanning = false, folderError = null, downloads = emptyList(),
+                trackSort = TrackSort.of(preferences.getString("trackSort:$tree", null)))
         }
         if (changed) refresh()
     }
@@ -183,8 +202,10 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
         preferences.edit { putString("tree", uri.toString()); putStringSet("libraries", ids) }
         if (uri != previous) {
             onChanged()
+            scannedTracks = emptyList()
             ui.update { it.copy(folder = null, hasFolderSelection = true, downloads = emptyList(),
-                libraries = savedLibraries(), activeLibrary = uri) }
+                libraries = savedLibraries(), activeLibrary = uri,
+                trackSort = TrackSort.of(preferences.getString("trackSort:$uri", null))) }
         }
         refresh()
     }
@@ -198,8 +219,11 @@ internal class MusicViewModel(application: Application) : AndroidViewModel(appli
                 val contents = withContext(Dispatchers.IO) { library.read(selected) }
                 if (tree != selected) return@launch
                 preferences.edit { putString("name:$selected", contents.name) }
-                val tracks = ordered("trackOrder:$selected", contents.tracks) { it.uri.toString() }
-                ui.update { it.copy(folder = contents.copy(tracks = tracks), libraries = savedLibraries(), scanning = false) }
+                scannedTracks = contents.tracks
+                ui.update {
+                    it.copy(folder = contents.copy(tracks = arranged(selected, contents.tracks, it.trackSort)),
+                        libraries = savedLibraries(), scanning = false)
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {

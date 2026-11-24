@@ -29,7 +29,9 @@ internal fun MusicScreen(
     onSwitchLibrary: (android.net.Uri) -> Unit,
     onDeleteTrack: (android.net.Uri) -> Unit, onForgetLibrary: (android.net.Uri) -> Unit,
     onMoveLibrary: (String, String) -> Unit, onMoveTrack: (String, String) -> Unit,
+    onTrackSort: (TrackSort) -> Unit,
 ) {
+    val manualOrder = state.trackSort == TrackSort.Manual
     var showDownload by rememberSaveable { mutableStateOf(false) }
     var showPlayer by rememberSaveable { mutableStateOf(false) }
     val folder = state.folder
@@ -152,6 +154,7 @@ internal fun MusicScreen(
                                         MusicGlyph(Glyph.Refresh, Modifier.size(18.dp), "Refresh")
                                     }
                                 }
+                                if (tracks.size > 1) TrackSortPresets(state.trackSort, onTrackSort)
                                 HorizontalDivider()
                             }
                              if (tracks.isEmpty() && !state.scanning) {
@@ -165,8 +168,9 @@ internal fun MusicScreen(
                         }
                         itemsIndexed(tracks, key = { _, track -> track.uri.toString() }) { index, track ->
                             val active = playing.id == track.uri.toString()
-                            Row(Modifier.fillMaxWidth().dragRow(track.uri.toString(), tracks.getOrNull(index-1)?.uri?.toString(),
-                                 tracks.getOrNull(index+1)?.uri?.toString(), trackDrag, onMoveTrack, "Delete file") { trackAction = track.uri.toString() }
+                            Row(Modifier.fillMaxWidth().dragRow(track.uri.toString(),
+                                 tracks.getOrNull(index-1)?.uri?.toString()?.takeIf { manualOrder },
+                                 tracks.getOrNull(index+1)?.uri?.toString()?.takeIf { manualOrder }, trackDrag, onMoveTrack, "Delete file") { trackAction = track.uri.toString() }
                                 .clickable(enabled = controller != null, role = Role.Button) {
                                 controller?.playTracks(tracks, index)
                             }.semantics { selected = active }.heightIn(min = 56.dp).padding(vertical = 8.dp),
@@ -183,7 +187,7 @@ internal fun MusicScreen(
                                         overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                if (tracks.size > 1) ReorderHandle(trackDrag, track.uri.toString())
+                                if (tracks.size > 1 && manualOrder) ReorderHandle(trackDrag, track.uri.toString())
                             }
                         }
                     }
@@ -203,6 +207,20 @@ internal fun MusicScreen(
     state.libraries.firstOrNull { it.uri.toString() == libraryAction }?.let { entry ->
         RemovalDialog(entry.name, "Remove this library? The folder and its files will be kept.",
             "Remove library", { libraryAction = null }) { onForgetLibrary(entry.uri) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrackSortPresets(selected: TrackSort, onSelect: (TrackSort) -> Unit) {
+    SingleChoiceSegmentedButtonRow(Modifier.padding(bottom = 8.dp)) {
+        TrackSort.entries.forEachIndexed { index, sort ->
+            SegmentedButton(
+                selected = sort == selected, onClick = { onSelect(sort) },
+                shape = SegmentedButtonDefaults.itemShape(index, TrackSort.entries.size),
+                icon = {},
+            ) { Text(sort.label) }
+        }
     }
 }
 

@@ -12,6 +12,7 @@ Android 8.0以降の64ビット端末（ARM64またはx86-64）向けの音楽�
 2. 曲をタップすると再生します。下部のミニプレーヤーを開くと、ジャケット付きの再生画面で曲送りや再生位置の変更ができます。別のアプリに切り替えても再生は続きます。
 3. **Import link** に保存が許可されたコンテンツのHTTPSリンクを貼り付けます。配信元の音声を再エンコードせず、選択中のフォルダに保存します。
 4. 曲やライブラリ名を長押しすると、軽い振動とともに確認画面が開きます。曲の削除・ライブラリの登録解除は、この画面で確定します。並べ替えは右端の `≡` を置きたい位置までドラッグします。
+5. 曲一覧の上の **Manual** と **A–Z** で並び順を切り替えます。**A–Z** は曲名順で、ドラッグ用の `≡` は表示されません。**Manual** に戻すと、ドラッグで決めた前回の順番に戻ります。ライブラリごとに選択と手動の順番を保存します。
 
 フォルダの権限はアプリの再起動後も保持されます。内部ストレージのルート、`Download` フォルダそのもの、`Android/data` などはAndroidの仕様上選べません。書き込みやファイル名変更を許さないフォルダには保存できません。URLの取得可否は、サイトの仕様やアクセス制限に依存します。
 
@@ -33,7 +34,7 @@ build.cmd :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 
 生成先：`app/build/outputs/apk/debug/app-debug.apk`
 
-版番号は `0.1.1`（versionCode `2`）です。`build.cmd :app:assembleRelease :app:testDebugUnitTest :app:lintRelease` で検査と未署名APKの生成ができます。配布用には Android SDK の `apksigner sign` で `app/build/outputs/apk/release/app-release-unsigned.apk` に署名し、`apksigner verify --verbose` で確認してください。以後の更新にも同じリリース鍵が必要です。
+版番号は `0.1.2`（versionCode `3`）です。`build.cmd :app:assembleRelease :app:testDebugUnitTest :app:lintRelease` で検査と未署名APKの生成ができます。配布用には Android SDK の `apksigner sign` で `app/build/outputs/apk/release/app-release-unsigned.apk` に署名し、`apksigner verify --verbose` で確認してください。以後の更新にも同じリリース鍵が必要です。
 
 ## 検証
 
@@ -42,6 +43,7 @@ build.cmd :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 ```bat
 python scripts/smoke_android.py --serial emulator-5558 --avd MusicSwitcherQA --apk app/build/outputs/apk/debug/app-debug.apk --player-ui --edge-cases
 python scripts/test_android_edges.py --serial emulator-5558 --avd MusicSwitcherQA --apk app/build/outputs/apk/debug/app-debug.apk
+python scripts/test_android_sort.py --serial emulator-5558 --avd MusicSwitcherQA --apk app/build/outputs/apk/debug/app-debug.apk
 python -m unittest discover -s scripts -p test_qa_tools.py
 ```
 
